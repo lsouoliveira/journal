@@ -1,17 +1,31 @@
 mod api;
 mod cli;
 mod db;
+mod gui;
 mod pager;
 
+use clap::Parser;
 use std::path::Path;
 
+#[derive(Parser, Debug)]
+struct Cli {
+    #[arg(short, long)]
+    gui: bool,
+}
+
 fn main() {
+    let args = Cli::parse();
+
     if !Path::new(&db::db_path()).exists() {
         setup_database();
     }
 
-    let mut application = build_application();
-    application.run()
+    if args.gui {
+        gui::Journal::new().run();
+    } else {
+        let mut cli_application = build_application();
+        cli_application.run()
+    }
 }
 
 fn build_application() -> cli::Application {

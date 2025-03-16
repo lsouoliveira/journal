@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+#[derive(Debug)]
 pub struct EntriesService {
     conn: rusqlite::Connection,
 }
@@ -137,6 +138,7 @@ impl EntriesService {
     }
 }
 
+#[derive(Debug)]
 pub struct Client {
     pub entries_service: EntriesService,
 }
