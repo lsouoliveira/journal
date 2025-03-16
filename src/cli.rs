@@ -17,6 +17,7 @@ impl Application {
     pub fn run(&mut self) {
         match self.matches.subcommand() {
             Some(("add", sub_matches)) => self.add_entry(sub_matches.clone()),
+            Some(("clear", _)) => self.clear(),
             _ => self.list_entries(),
         }
     }
@@ -28,6 +29,7 @@ impl Application {
                     .about("Adds a new entry")
                     .arg(arg!(<message> "Entry message")),
             )
+            .subcommand(Command::new("clear").about("Deletes all entries"))
             .get_matches();
 
         Application::new(matches, client)
@@ -41,6 +43,10 @@ impl Application {
         };
 
         self.client.entries_service.create_entry(new_entry)
+    }
+
+    fn clear(&mut self) {
+        self.client.entries_service.destroy_all()
     }
 
     fn list_entries(&mut self) {

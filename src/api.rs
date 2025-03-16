@@ -136,6 +136,14 @@ impl EntriesService {
 
         result
     }
+
+    pub fn destroy_all(&mut self) {
+        let query = "
+            DELETE FROM journal_entries;
+        ";
+
+        self.conn.execute(query, ()).unwrap();
+    }
 }
 
 #[derive(Debug)]

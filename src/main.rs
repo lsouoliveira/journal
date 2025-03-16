@@ -4,23 +4,16 @@ mod db;
 mod gui;
 mod pager;
 
-use clap::Parser;
 use std::path::Path;
 
-#[derive(Parser, Debug)]
-struct Cli {
-    #[arg(short, long)]
-    gui: bool,
-}
-
 fn main() {
-    let args = Cli::parse();
+    let args: Vec<String> = std::env::args().collect();
 
     if !Path::new(&db::db_path()).exists() {
         setup_database();
     }
 
-    if args.gui {
+    if args.contains(&"--gui".to_string()) {
         gui::Journal::new().run();
     } else {
         let mut cli_application = build_application();
