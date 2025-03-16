@@ -1,4 +1,7 @@
 use crate::api;
+use crate::pager;
+
+use chrono::Local;
 use clap::{arg, command, ArgMatches, Command};
 
 pub struct Application {
@@ -41,6 +44,31 @@ impl Application {
     }
 
     fn list_entries(&mut self) {
-        println!("list entries")
+        let entries = self.client.entries_service.all();
+        let mut output: String = String::new();
+
+        for (index, entry) in entries.iter().enumerate() {
+            if index > 0 {
+                output += "\n\n";
+            }
+
+            output += &format_entry(&entry);
+        }
+
+        pager::start_pager(&output)
     }
+}
+
+fn format_entry(entry: &api::EntryRead) -> String {
+    let output = format!(
+        "\x1b[38;5;214mentry {}\x1b[0m\nDate: {}\n\n    {}",
+        entry.id.to_string(),
+        entry
+            .created_at
+            .with_timezone(&Local)
+            .format("%a %b %d %H:%M:%S %Y %z"),
+        entry.message
+    );
+
+    output
 }

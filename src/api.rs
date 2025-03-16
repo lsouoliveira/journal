@@ -1,18 +1,23 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-pub struct EntriesService {}
+pub struct EntriesService {
+    conn: rusqlite::Connection,
+}
 
 struct Entry {
     id: Option<Uuid>,
-    created_at: Option<DateTime<Utc>>,
     message: Option<String>,
+    created_at: Option<DateTime<Utc>>,
+    updated_at: Option<DateTime<Utc>>,
 }
 
+#[derive(Debug)]
 pub struct EntryRead {
-    id: Uuid,
-    created_at: Option<DateTime<Utc>>,
-    message: String,
+    pub id: Uuid,
+    pub message: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 pub struct EntryCreate {
@@ -20,28 +25,115 @@ pub struct EntryCreate {
 }
 
 pub struct EntryPagination {
-    items: Vec<EntryRead>,
-    total_items: u32,
-    page: u32,
-    total_pages: u32,
+    pub items: Vec<EntryRead>,
+    pub total_items: u32,
+    pub page: u32,
+    pub total_pages: u32,
 }
 
 impl EntriesService {
-    pub fn new() -> EntriesService {
-        EntriesService {}
+    pub fn new(conn: rusqlite::Connection) -> EntriesService {
+        EntriesService { conn }
     }
 
     pub fn create_entry(&mut self, entry_create: EntryCreate) {
-        println!("create entry")
+        let new_entry = Entry {
+            id: Some(Uuid::new_v4()),
+            message: Some(entry_create.message),
+            created_at: Some(Utc::now()),
+            updated_at: Some(Utc::now()),
+        };
+
+        let query = "
+            INSERT INTO journal_entries (id, message, created_at, updated_at) VALUES (?, ?, ?, ?)
+        ";
+
+        self.conn
+            .execute(
+                query,
+                (
+                    &new_entry.id.unwrap().to_string(),
+                    &new_entry.message.unwrap().to_string(),
+                    &new_entry.created_at.unwrap().to_rfc3339(),
+                    &new_entry.updated_at.unwrap().to_rfc3339(),
+                ),
+            )
+            .unwrap();
     }
 
-    pub fn list_entries(&mut self, page: u32) -> EntryPagination {
-        EntryPagination {
-            items: vec![],
-            total_items: 0,
-            page: 1,
-            total_pages: 0,
+    pub fn list_entries(&mut self, page: u32, limit: u32) -> EntryPagination {
+        if page <= 0 {
+            panic!("Page should be positive: {}", page);
         }
+
+        if limit <= 0 {
+            panic!("Limit should be positive: {}", limit);
+        }
+
+        let mut result: Vec<EntryRead> = vec![];
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT id, message, created_at, updated_at FROM journal_entries ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            )
+            .unwrap();
+
+        let entries = stmt
+            .query_map([limit, (page - 1) * limit], |row| {
+                let id: String = row.get(0).unwrap();
+
+                Ok(EntryRead {
+                    id: Uuid::parse_str(&id).unwrap(),
+                    message: row.get(1).unwrap(),
+                    created_at: row.get(2).unwrap(),
+                    updated_at: row.get(3).unwrap(),
+                })
+            })
+            .unwrap();
+
+        for entry in entries {
+            result.push(entry.unwrap());
+        }
+
+        let mut stmt = self
+            .conn
+            .prepare("SELECT COUNT(*) FROM journal_entries")
+            .unwrap();
+
+        let total_items: u32 = stmt.query_row([], |row| Ok(row.get(0).unwrap())).unwrap();
+
+        EntryPagination {
+            items: result,
+            total_items,
+            page,
+            total_pages: total_items / limit,
+        }
+    }
+
+    pub fn all(&mut self) -> Vec<EntryRead> {
+        let mut result: Vec<EntryRead> = vec![];
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, message, created_at, updated_at FROM journal_entries ORDER BY created_at DESC")
+            .unwrap();
+
+        let entries = stmt
+            .query_map([], |row| {
+                let id: String = row.get(0).unwrap();
+                Ok(EntryRead {
+                    id: Uuid::parse_str(&id).unwrap(),
+                    message: row.get(1).unwrap(),
+                    created_at: row.get(2).unwrap(),
+                    updated_at: row.get(3).unwrap(),
+                })
+            })
+            .unwrap();
+
+        for entry in entries {
+            result.push(entry.unwrap());
+        }
+
+        result
     }
 }
 
