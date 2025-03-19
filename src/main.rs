@@ -3,6 +3,7 @@ mod cli;
 mod db;
 mod gui;
 mod pager;
+mod date_parser;
 
 use std::path::Path;
 
