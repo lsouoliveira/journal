@@ -3,7 +3,7 @@ use chrono::Timelike;
 use chrono::{DateTime, Local, NaiveTime};
 
 #[derive(Debug)]
-struct DateParserError {
+pub struct DateParserError {
     message: String,
 }
 
@@ -13,7 +13,7 @@ impl std::fmt::Display for DateParserError {
     }
 }
 
-fn parse_date(input: &str) -> Result<DateTime<Local>, DateParserError> {
+pub fn parse_date(input: &str) -> Result<DateTime<Local>, DateParserError> {
     let sanitized_input: String = input
         .to_lowercase()
         .chars()

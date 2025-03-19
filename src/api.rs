@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use uuid::Uuid;
 
 #[derive(Debug)]
@@ -25,11 +25,25 @@ pub struct EntryCreate {
     pub message: String,
 }
 
+pub struct EntryDestroy {
+    pub id: Uuid,
+}
+
 pub struct EntryPagination {
     pub items: Vec<EntryRead>,
     pub total_items: u32,
     pub page: u32,
     pub total_pages: u32,
+}
+
+pub struct ListEntriesParams {
+    pub since: Option<DateTime<Local>>,
+}
+
+impl Default for ListEntriesParams {
+    fn default() -> ListEntriesParams {
+        ListEntriesParams { since: None }
+    }
 }
 
 impl EntriesService {
@@ -111,15 +125,26 @@ impl EntriesService {
         }
     }
 
-    pub fn all(&mut self) -> Vec<EntryRead> {
+    pub fn all(&mut self, params: ListEntriesParams) -> Vec<EntryRead> {
         let mut result: Vec<EntryRead> = vec![];
         let mut stmt = self
             .conn
-            .prepare("SELECT id, message, created_at, updated_at FROM journal_entries ORDER BY created_at DESC")
+            .prepare(
+                "SELECT id, message, created_at, updated_at 
+                FROM journal_entries 
+                WHERE (?1 IS NULL or datetime(created_at) >= datetime(?1)) ORDER BY created_at DESC
+            ",
+            )
             .unwrap();
 
+        let since = if let Some(since) = params.since {
+            Some(since.to_utc())
+        } else {
+            None
+        };
+
         let entries = stmt
-            .query_map([], |row| {
+            .query_map([since], |row| {
                 let id: String = row.get(0).unwrap();
                 Ok(EntryRead {
                     id: Uuid::parse_str(&id).unwrap(),
@@ -135,6 +160,16 @@ impl EntriesService {
         }
 
         result
+    }
+
+    pub fn delete_entry(&mut self, entry_destroy: EntryDestroy) {
+        let query = "
+            DELETE FROM journal_entries WHERE id = ?;
+        ";
+
+        self.conn
+            .execute(query, [entry_destroy.id.to_string()])
+            .unwrap();
     }
 
     pub fn destroy_all(&mut self) {
